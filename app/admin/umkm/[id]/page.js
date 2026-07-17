@@ -30,8 +30,8 @@ export default function UmkmDetail() {
 
   async function toggleStatus() {
     setSavingStatus(true);
-    const statusSekarang = statusList.find((s) => s.tahun === 2026)?.status;
-    const statusBaru = statusSekarang === 'Aktif' ? 'Tidak Aktif' : 'Aktif';
+    const statusTerbaru = [...statusList].sort((a, b) => b.tahun - a.tahun)[0]?.status;
+    const statusBaru = statusTerbaru === 'Aktif' ? 'Tidak Aktif' : 'Aktif';
     await supabase.from('status_tahunan').upsert(
       { id_umkm: id, tahun: 2026, status: statusBaru },
       { onConflict: 'id_umkm,tahun' }
@@ -217,8 +217,13 @@ export default function UmkmDetail() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                 <h2 style={{ fontSize: 24 }}>{umkm.nama_umkm}</h2>
                 {(() => {
-                  const statusTahunIni = statusList.find((s) => s.tahun === 2026)?.status || 'Belum ada data';
-                  return <span className={`badge ${statusTahunIni === 'Aktif' ? 'ok' : 'bad'}`}>{statusTahunIni}</span>;
+                  const terbaru = [...statusList].sort((a, b) => b.tahun - a.tahun)[0];
+                  if (!terbaru) return <span className="badge warn">Belum ada data</span>;
+                  return (
+                    <span className={`badge ${terbaru.status === 'Aktif' ? 'ok' : 'bad'}`}>
+                      {terbaru.status}{terbaru.tahun !== 2026 && ` (${terbaru.tahun})`}
+                    </span>
+                  );
                 })()}
               </div>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
