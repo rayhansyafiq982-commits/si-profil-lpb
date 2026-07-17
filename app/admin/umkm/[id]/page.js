@@ -17,6 +17,8 @@ export default function UmkmDetail() {
   const [omzet, setOmzet] = useState([]);
   const [program, setProgram] = useState([]);
   const [log, setLog] = useState([]);
+  const [statusList, setStatusList] = useState([]);
+  const [savingStatus, setSavingStatus] = useState(false);
 
   const [showProgramForm, setShowProgramForm] = useState(false);
   const [newProgram, setNewProgram] = useState({ kategori: 'Pelatihan', nama_program: '', tahun: 2026, tanggal: '', status: 'Selesai' });
@@ -25,6 +27,19 @@ export default function UmkmDetail() {
   const [showLinkBox, setShowLinkBox] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [linkPribadi, setLinkPribadi] = useState('');
+
+  async function toggleStatus() {
+    setSavingStatus(true);
+    const statusSekarang = statusList.find((s) => s.tahun === 2026)?.status;
+    const statusBaru = statusSekarang === 'Aktif' ? 'Tidak Aktif' : 'Aktif';
+    await supabase.from('status_tahunan').upsert(
+      { id_umkm: id, tahun: 2026, status: statusBaru },
+      { onConflict: 'id_umkm,tahun' }
+    );
+    await catatLog(id, 'Ubah Status', `Status ${umkm.nama_umkm} diubah jadi ${statusBaru}`);
+    setSavingStatus(false);
+    loadAll();
+  }
 
   async function bagikanLink() {
     const origin = window.location.origin;
@@ -132,7 +147,7 @@ export default function UmkmDetail() {
 
   async function loadAll() {
     setLoading(true);
-    const [u, l, p, k, kl, o, pr, lg] = await Promise.all([
+    const [u, l, p, k, kl, o, pr, lg, st] = await Promise.all([
       supabase.from('master_umkm').select('*').eq('id_umkm', id).single(),
       supabase.from('legalitas').select('*').eq('id_umkm', id),
       supabase.from('produk').select('*').eq('id_umkm', id),
@@ -141,6 +156,7 @@ export default function UmkmDetail() {
       supabase.from('omzet_bulanan').select('*').eq('id_umkm', id).order('tahun').order('bulan'),
       supabase.from('program_aktivitas').select('*').eq('id_umkm', id).order('tahun', { ascending: false }),
       supabase.from('log_perubahan').select('*').eq('id_umkm', id).order('created_at', { ascending: false }).limit(10),
+      supabase.from('status_tahunan').select('*').eq('id_umkm', id).order('tahun'),
     ]);
     setUmkm(u.data);
     setLegalitas(l.data || []);
@@ -150,6 +166,7 @@ export default function UmkmDetail() {
     setOmzet(o.data || []);
     setProgram(pr.data || []);
     setLog(lg.data || []);
+    setStatusList(st.data || []);
     setLoading(false);
   }
 
@@ -197,11 +214,20 @@ export default function UmkmDetail() {
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div>
               <div className="id-mono">{umkm.id_umkm}</div>
-              <h2 style={{ fontSize: 24, marginTop: 4 }}>{umkm.nama_umkm}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <h2 style={{ fontSize: 24 }}>{umkm.nama_umkm}</h2>
+                {(() => {
+                  const statusTahunIni = statusList.find((s) => s.tahun === 2026)?.status || 'Belum ada data';
+                  return <span className={`badge ${statusTahunIni === 'Aktif' ? 'ok' : 'bad'}`}>{statusTahunIni}</span>;
+                })()}
+              </div>
               <div style={{ fontSize: 13, color: 'var(--ink-soft)', marginTop: 4 }}>
                 {umkm.nama_pemilik && <>Pemilik: {umkm.nama_pemilik} · </>}
                 {umkm.wilayah} · Bergabung {umkm.tahun_masuk || '-'}
               </div>
+              <button className="btn-ghost no-print" style={{ marginTop: 6, fontSize: 11.5 }} onClick={toggleStatus} disabled={savingStatus}>
+                {savingStatus ? 'Menyimpan...' : '🔄 Ubah status Aktif / Tidak Aktif (tahun 2026)'}
+              </button>
             </div>
             <div style={{ textAlign: 'right', fontSize: 13, color: 'var(--ink-soft)' }}>
               <div>📞 {umkm.no_hp || 'Belum ada nomor'}</div>
@@ -463,4 +489,4 @@ export default function UmkmDetail() {
       )}
     </div>
   );
-}
+                }
