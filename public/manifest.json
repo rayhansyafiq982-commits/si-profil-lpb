@@ -1,0 +1,14 @@
+{
+  "name": "SI-PROFIL — UMKM Binaan LPB Pama Bessai Berinta",
+  "short_name": "SI-PROFIL",
+  "description": "Sistem Informasi Profil UMKM Binaan LPB Pama Bessai Berinta",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF6EF",
+  "theme_color": "#0B3B3C",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
