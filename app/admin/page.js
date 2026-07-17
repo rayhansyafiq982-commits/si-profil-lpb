@@ -79,11 +79,16 @@ export default function AdminDashboard() {
     setLoading(false);
   }
 
-  function isPerluPerhatian(id) {
-    if (statusMap[id] === 'Tidak Aktif') return true;
+  function alasanPerhatian(id) {
+    const alasan = [];
+    if (statusMap[id] === 'Tidak Aktif') alasan.push('Tidak Aktif');
     const trend = (omzetTrendMap[id] || []).slice(-3);
-    if (trend.length === 3 && trend[0] > trend[1] && trend[1] > trend[2]) return true;
-    return false;
+    if (trend.length === 3 && trend[0] > trend[1] && trend[1] > trend[2]) alasan.push('Omzet Turun');
+    return alasan;
+  }
+
+  function isPerluPerhatian(id) {
+    return alasanPerhatian(id).length > 0;
   }
 
   const wilayahOpsi = useMemo(() => {
@@ -204,11 +209,17 @@ export default function AdminDashboard() {
             const status = statusMap[u.id_umkm] || '-';
             const kelas = kelasMap[u.id_umkm] || {};
             const legalitas = legalitasMap[u.id_umkm] || [];
-            const perhatian = isPerluPerhatian(u.id_umkm);
+            const alasan = alasanPerhatian(u.id_umkm);
+            const perhatian = alasan.length > 0;
             return (
               <Link key={u.id_umkm} href={`/admin/umkm/${u.id_umkm}`} className="grid-row grid-body" style={{ background: perhatian ? '#fdf3ef' : undefined }}>
                 <div className="id-mono">{u.id_umkm} {u.link_dibagikan_tanggal ? <span title="Link sudah dibagikan">🔗</span> : <span title="Link belum dibagikan" style={{ opacity: 0.3 }}>🔗</span>}</div>
-                <div>{perhatian && '⚠ '}{u.nama_umkm}</div>
+                <div>
+                  {u.nama_umkm}
+                  {alasan.map((a) => (
+                    <span key={a} className="badge" style={{ background: '#f6deda', color: '#9c3b26', marginLeft: 4, fontSize: 9 }}>⚠ {a}</span>
+                  ))}
+                </div>
                 <div>{u.wilayah || '-'}</div>
                 <div>{kelas.PAMA ? <span className="badge ok">{kelas.PAMA}</span> : '-'}</div>
                 <div>{kelas.YDBA ? <span className="badge ok">{kelas.YDBA}</span> : '-'}</div>
