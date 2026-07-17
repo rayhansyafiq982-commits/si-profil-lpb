@@ -25,6 +25,10 @@ export default function LandingPage() {
           Belum punya atau lupa link-nya? Hubungi Fasilitator LPB Anda.
         </p>
       </div>
+
+      <Link href="/admin/login" style={{ display: 'inline-block', marginTop: 28, fontSize: 12, color: 'var(--ink-soft)', textDecoration: 'none', borderBottom: '1px dotted var(--ink-soft)' }}>
+        🔒 Masuk sebagai Fasilitator
+      </Link>
     </div>
   );
 }
