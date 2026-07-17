@@ -17,9 +17,9 @@ export default function RekapWilayah() {
     const { data: umkm } = await supabase.from('master_umkm').select('id_umkm, wilayah').order('wilayah');
     setUmkmList(umkm || []);
 
-    const { data: status } = await supabase.from('status_tahunan').select('*').eq('tahun', 2026);
+    const { data: status } = await supabase.from('status_tahunan').select('*').order('tahun');
     const sMap = {};
-    (status || []).forEach((s) => { sMap[s.id_umkm] = s.status; });
+    (status || []).forEach((s) => { sMap[s.id_umkm] = s.status; }); // tahun terbaru menimpa yang lebih lama
     setStatusMap(sMap);
 
     const { data: kelas } = await supabase.from('kelas_kemandirian').select('*').eq('tahun', 2026).eq('jenis_penilai', 'PAMA');
@@ -41,7 +41,7 @@ export default function RekapWilayah() {
       const w = u.wilayah || '(Tidak diketahui)';
       if (!grup[w]) grup[w] = { total: 0, aktif: 0, omzetTotal: 0, omzetCount: 0, kelas: { Pemula: 0, Madya: 0, 'Pra Mandiri': 0, Mandiri: 0, '-': 0 } };
       grup[w].total += 1;
-      if (statusMap[u.id_umkm] !== 'Tidak Aktif') grup[w].aktif += 1;
+      if (statusMap[u.id_umkm] === 'Aktif') grup[w].aktif += 1;
       const k = kelasMap[u.id_umkm] || '-';
       grup[w].kelas[k] = (grup[w].kelas[k] || 0) + 1;
       const o = omzetTerakhirMap[u.id_umkm];
@@ -86,4 +86,4 @@ export default function RekapWilayah() {
       </div>
     </div>
   );
-}
+                      }
