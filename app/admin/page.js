@@ -8,6 +8,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [umkmList, setUmkmList] = useState([]);
   const [statusMap, setStatusMap] = useState({});
+  const [statusTahunMap, setStatusTahunMap] = useState({});
   const [kelasMap, setKelasMap] = useState({});
   const [legalitasMap, setLegalitasMap] = useState({});
   const [produkCountMap, setProdukCountMap] = useState({});
@@ -19,6 +20,7 @@ export default function AdminDashboard() {
   const [filterWilayah, setFilterWilayah] = useState('');
   const [filterPerhatian, setFilterPerhatian] = useState(false);
   const [filterLinkBelum, setFilterLinkBelum] = useState(false);
+  const [sembunyikanTidakAktif, setSembunyikanTidakAktif] = useState(true);
   const [tahunAktif, setTahunAktif] = useState(2026);
 
   useEffect(() => { loadData(); }, []);
@@ -28,10 +30,16 @@ export default function AdminDashboard() {
     const { data: umkm } = await supabase.from('master_umkm').select('*').order('id_umkm');
     setUmkmList(umkm || []);
 
-    const { data: status } = await supabase.from('status_tahunan').select('*').eq('tahun', 2026);
+    const { data: status } = await supabase.from('status_tahunan').select('*').order('tahun');
     const sMap = {};
-    (status || []).forEach((s) => { sMap[s.id_umkm] = s.status; });
+    const sTahunMap = {};
+    (status || []).forEach((s) => {
+      // simpan status dari tahun paling baru yang tersedia per UMKM (menimpa yang lebih lama)
+      sMap[s.id_umkm] = s.status;
+      sTahunMap[s.id_umkm] = s.tahun;
+    });
     setStatusMap(sMap);
+    setStatusTahunMap(sTahunMap);
 
     const { data: kelas } = await supabase.from('kelas_kemandirian').select('*').eq('tahun', 2026);
     const kMap = {};
@@ -100,15 +108,16 @@ export default function AdminDashboard() {
       if (filterWilayah && u.wilayah !== filterWilayah) return false;
       if (filterPerhatian && !isPerluPerhatian(u.id_umkm)) return false;
       if (filterLinkBelum && u.link_dibagikan_tanggal) return false;
+      if (sembunyikanTidakAktif && statusMap[u.id_umkm] === 'Tidak Aktif') return false;
       return true;
     });
-  }, [umkmList, search, filterKelas, filterWilayah, filterPerhatian, filterLinkBelum, kelasMap, statusMap, omzetTrendMap]);
+  }, [umkmList, search, filterKelas, filterWilayah, filterPerhatian, filterLinkBelum, sembunyikanTidakAktif, kelasMap, statusMap, omzetTrendMap]);
 
   const kpi = useMemo(() => {
     const total = umkmList.length;
     const lengkap = umkmList.filter((u) => (legalitasMap[u.id_umkm] || []).length > 0 && (produkCountMap[u.id_umkm] || 0) > 0).length;
     const perhatian = umkmList.filter((u) => isPerluPerhatian(u.id_umkm)).length;
-    const aktif = umkmList.filter((u) => statusMap[u.id_umkm] !== 'Tidak Aktif').length;
+    const aktif = umkmList.filter((u) => statusMap[u.id_umkm] === 'Aktif').length;
     const linkBelum = umkmList.filter((u) => !u.link_dibagikan_tanggal).length;
     return { total, lengkap, perhatian, aktif, linkBelum };
   }, [umkmList, legalitasMap, produkCountMap, statusMap, omzetTrendMap]);
@@ -179,6 +188,10 @@ export default function AdminDashboard() {
           <input type="checkbox" checked={filterLinkBelum} onChange={(e) => setFilterLinkBelum(e.target.checked)} />
           🔗 Link belum dibagikan
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '0 8px' }}>
+          <input type="checkbox" checked={!sembunyikanTidakAktif} onChange={(e) => setSembunyikanTidakAktif(!e.target.checked)} />
+          Tampilkan yang tidak aktif juga
+        </label>
       </div>
 
       <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
@@ -202,14 +215,22 @@ export default function AdminDashboard() {
                 <div>{legalitas.length ? legalitas.join(', ') : <span className="badge bad">Belum ada</span>}</div>
                 <div>{produkCountMap[u.id_umkm] || 0}</div>
                 <div>{programCountMap[u.id_umkm] || 0}</div>
-                <div><span className={`badge ${status === 'Aktif' ? 'ok' : 'bad'}`}>{status}</span></div>
+                <div>
+                  <span className={`badge ${status === 'Aktif' ? 'ok' : 'bad'}`}>{status}</span>
+                  {statusTahunMap[u.id_umkm] && statusTahunMap[u.id_umkm] !== 2026 && (
+                    <span style={{ fontSize: 9.5, color: 'var(--ink-soft)', marginLeft: 4 }}>({statusTahunMap[u.id_umkm]})</span>
+                  )}
+                </div>
               </Link>
             );
           })}
         </div>
         {filtered.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: 'var(--ink-soft)' }}>Tidak ada UMKM yang cocok dengan filter.</div>}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 10 }}>Menampilkan {filtered.length} dari {umkmList.length} UMKM binaan</div>
+      <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 10 }}>
+        Menampilkan {filtered.length} dari {umkmList.length} UMKM binaan
+        {sembunyikanTidakAktif && kpi.total - kpi.aktif > 0 && ` (${kpi.total - kpi.aktif} UMKM tidak aktif disembunyikan — centang "Tampilkan yang tidak aktif juga" untuk melihatnya)`}
+      </div>
     </div>
   );
-}
+  }
