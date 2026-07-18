@@ -6,6 +6,7 @@ import { supabase, catatLog, KATEGORI_PROGRAM } from '../../../lib/supabase';
 export default function ProgramManagement() {
   const [loading, setLoading] = useState(true);
   const [program, setProgram] = useState([]);
+  const [programRencana, setProgramRencana] = useState([]);
   const [umkmList, setUmkmList] = useState([]);
   const [tahunPilih, setTahunPilih] = useState(2026);
   const [expandedProgram, setExpandedProgram] = useState({});
@@ -18,17 +19,21 @@ export default function ProgramManagement() {
   const [cariUmkm, setCariUmkm] = useState('');
   const [dipilih, setDipilih] = useState(new Set());
   const [saving, setSaving] = useState(false);
+  const [rencanaAktif, setRencanaAktif] = useState(null);
+  const [hapusRencanaId, setHapusRencanaId] = useState(null);
 
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
     setLoading(true);
-    const [p, u] = await Promise.all([
+    const [p, u, r] = await Promise.all([
       supabase.from('program_aktivitas').select('id_umkm, kategori, nama_program, tahun, tanggal, sumber').order('tanggal', { ascending: false }),
       supabase.from('master_umkm').select('id_umkm, nama_umkm, wilayah').order('nama_umkm'),
+      supabase.from('program_rencana').select('*').order('kategori').order('nama_program'),
     ]);
     setProgram(p.data || []);
     setUmkmList(u.data || []);
+    setProgramRencana(r.data || []);
     setLoading(false);
   }
 
@@ -79,13 +84,14 @@ export default function ProgramManagement() {
     setDipilih(next);
   }
 
-  function bukaForm() {
-    setFormKategori('Pelatihan');
-    setFormNama('');
+  function bukaForm(rencana) {
+    setFormKategori(rencana ? rencana.kategori : 'Pelatihan');
+    setFormNama(rencana ? rencana.nama_program : '');
     setFormTanggal('');
     setFormTahun(tahunPilih);
     setCariUmkm('');
     setDipilih(new Set());
+    setRencanaAktif(rencana || null);
     setShowForm(true);
   }
 
@@ -100,9 +106,23 @@ export default function ProgramManagement() {
     await Promise.all(
       Array.from(dipilih).map((id_umkm) => catatLog(id_umkm, 'Tambah Program', `${formKategori}: ${formNama.trim()} (ditambahkan massal)`))
     );
+    if (rencanaAktif && rencanaAktif.status !== 'Sedang Berjalan') {
+      await supabase.from('program_rencana').update({ status: 'Sudah Terlaksana', updated_at: new Date().toISOString() }).eq('id', rencanaAktif.id);
+    } else if (rencanaAktif) {
+      // Program berulang (Pendampingan bulanan) — cukup catat waktu pencatatan terakhir, status tetap "Sedang Berjalan"
+      await supabase.from('program_rencana').update({ updated_at: new Date().toISOString() }).eq('id', rencanaAktif.id);
+    }
     setSaving(false);
     setShowForm(false);
+    setRencanaAktif(null);
     loadAll();
+  }
+
+  async function hapusRencana(id) {
+    setHapusRencanaId(id);
+    await supabase.from('program_rencana').delete().eq('id', id);
+    loadAll();
+    setHapusRencanaId(null);
   }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-soft)' }}>Memuat data program...</div>;
@@ -118,14 +138,67 @@ export default function ProgramManagement() {
           <select value={tahunPilih} onChange={(e) => setTahunPilih(parseInt(e.target.value))} style={{ padding: '10px 14px', border: '1.4px solid var(--line)', borderRadius: 8, fontSize: 14, fontWeight: 700, color: 'var(--teal-900)' }}>
             {tahunTersedia.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
-          <button className="btn-primary" onClick={bukaForm}>+ Tambah Program</button>
+          <button className="btn-primary" onClick={() => bukaForm(null)}>+ Tambah Program</button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
         <div className="card"><div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--teal-900)' }}>{totalProgramTahunIni}</div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Jenis program berjalan di {tahunPilih}</div></div>
         <div className="card"><div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--sage)' }}>{totalPesertaTahunIni}</div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Total keikutsertaan UMKM di {tahunPilih}</div></div>
+        <div className="card">
+          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--teal-500)' }}>{programRencana.filter((r) => r.status === 'Sedang Berjalan').length}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>🔄 Pendampingan berjalan (bulanan)</div>
+        </div>
+        <div className="card" style={{ borderColor: programRencana.filter((r) => r.status === 'Belum Terlaksana').length > 0 ? 'var(--gold-500)' : 'var(--line)' }}>
+          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--gold-500)' }}>{programRencana.filter((r) => r.status === 'Belum Terlaksana').length}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>📋 Program direncanakan, belum terlaksana</div>
+        </div>
       </div>
+
+      {programRencana.filter((r) => r.status === 'Sedang Berjalan').length > 0 && (
+        <div className="card" style={{ marginBottom: 20, borderColor: 'var(--teal-500)' }}>
+          <h4 style={{ fontSize: 15, marginBottom: 4 }}>🔄 Pendampingan — Berjalan Setiap Bulan</h4>
+          <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 12 }}>Aktivitas rutin, bukan acara sekali jalan. Klik "📝 Catat Bulan Ini" tiap kali ada UMKM yang ikut — daftar ini tidak akan hilang setelah dicatat, karena berlangsung terus tiap bulan.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {programRencana.filter((r) => r.status === 'Sedang Berjalan').map((r, i) => (
+              <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 0', borderTop: i > 0 ? '1px solid var(--line)' : 'none' }}>
+                <div>
+                  <span style={{ fontSize: 13 }}>{r.nama_program}</span>
+                  {r.updated_at && <span style={{ fontSize: 10.5, color: 'var(--ink-soft)', marginLeft: 8 }}>terakhir dicatat {new Date(r.updated_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</span>}
+                </div>
+                <button className="btn-ghost" style={{ fontSize: 10.5, padding: '4px 8px', flexShrink: 0 }} onClick={() => bukaForm(r)}>📝 Catat Bulan Ini</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {programRencana.filter((r) => r.status === 'Belum Terlaksana').length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h4 style={{ fontSize: 15, marginBottom: 4 }}>📋 Program Direncanakan — Belum Terlaksana</h4>
+          <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 12 }}>Checklist program yang sudah direncanakan tapi belum ada pesertanya. Klik "Tandai Terlaksana" begitu program benar-benar berjalan, lalu pilih UMKM yang ikut.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            {KATEGORI_PROGRAM.concat(['Lainnya']).map((kat) => {
+              const items = programRencana.filter((r) => r.kategori === kat && r.status === 'Belum Terlaksana');
+              if (items.length === 0) return null;
+              return (
+                <div key={kat}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--teal-900)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>{kat}</div>
+                  {items.map((r) => (
+                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: '1px solid var(--line)' }}>
+                      <span style={{ fontSize: 12.5 }}>{r.nama_program}</span>
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <button className="btn-ghost" style={{ fontSize: 10.5, padding: '4px 8px' }} onClick={() => bukaForm(r)}>✅ Tandai Terlaksana</button>
+                        <button onClick={() => hapusRencana(r.id)} disabled={hapusRencanaId === r.id} style={{ background: 'none', border: 'none', color: 'var(--clay)', fontSize: 10.5, cursor: 'pointer' }}>Hapus</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {KATEGORI_PROGRAM.map((kat) => (
@@ -160,9 +233,9 @@ export default function ProgramManagement() {
       </div>
 
       {showForm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(11,59,60,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }} onClick={() => setShowForm(false)}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(11,59,60,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20 }} onClick={() => { setShowForm(false); setRencanaAktif(null); }}>
           <div className="card" style={{ maxWidth: 560, width: '100%', maxHeight: '85vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: 17, marginBottom: 16 }}>+ Tambah Program Baru</h3>
+            <h3 style={{ fontSize: 17, marginBottom: 16 }}>{rencanaAktif ? (rencanaAktif.status === 'Sedang Berjalan' ? '📝 Catat Pendampingan Bulan Ini' : '✅ Tandai Program Terlaksana') : '+ Tambah Program Baru'}</h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div className="field" style={{ margin: 0 }}>
@@ -200,7 +273,7 @@ export default function ProgramManagement() {
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-              <button className="btn-secondary" onClick={() => setShowForm(false)}>Batal</button>
+              <button className="btn-secondary" onClick={() => { setShowForm(false); setRencanaAktif(null); }}>Batal</button>
               <button className="btn-primary" style={{ flex: 1 }} onClick={simpanProgram} disabled={saving || !formNama.trim() || dipilih.size === 0}>
                 {saving ? 'Menyimpan...' : `Simpan untuk ${dipilih.size} UMKM`}
               </button>
