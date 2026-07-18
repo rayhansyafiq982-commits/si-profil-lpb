@@ -425,15 +425,20 @@ export default function UmkmDetail() {
           if (rows.length === 0) return null;
           const totalOmzet = rows.reduce((s, r) => s + (r.omzet || 0), 0);
           const rataOmzet = totalOmzet / rows.length;
+          const rowsProfit = rows.filter((r) => r.profit !== null);
+          const totalProfit = rowsProfit.reduce((s, r) => s + (r.profit || 0), 0);
+          const rataProfit = rowsProfit.length > 0 ? totalProfit / rowsProfit.length : null;
           return (
             <div key={tahun} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal-900)', marginBottom: 6 }}>
-                {tahun} — Rata-rata Rp{Math.round(rataOmzet).toLocaleString('id-ID')}/bulan
+                {tahun} — Rata-rata Omzet Rp{Math.round(rataOmzet).toLocaleString('id-ID')}/bulan
+                {rataProfit !== null && <span style={{ color: 'var(--sage)' }}> · Profit Rp{Math.round(rataProfit).toLocaleString('id-ID')}/bulan</span>}
               </div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {rows.map((r) => (
                   <div key={r.bulan} title={`Bulan ${r.bulan}`} style={{ fontSize: 11, background: 'var(--cream)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 8px' }}>
-                    {r.bulan}: Rp{(r.omzet / 1000000).toFixed(1)}jt
+                    <div>{r.bulan}: Rp{(r.omzet / 1000000).toFixed(1)}jt</div>
+                    {r.profit !== null && <div style={{ color: 'var(--sage)' }}>Profit Rp{(r.profit / 1000000).toFixed(1)}jt</div>}
                   </div>
                 ))}
               </div>
