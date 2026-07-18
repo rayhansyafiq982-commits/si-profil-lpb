@@ -24,6 +24,7 @@ export default function UmkmDetail() {
   const [newProgram, setNewProgram] = useState({ kategori: 'Pelatihan', nama_program: '', tahun: 2026, tanggal: '', status: 'Selesai' });
 
   const [filterTahunProgram, setFilterTahunProgram] = useState('semua');
+  const [expandedProgram, setExpandedProgram] = useState({});
   const [showLinkBox, setShowLinkBox] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [linkPribadi, setLinkPribadi] = useState('');
@@ -204,6 +205,23 @@ export default function UmkmDetail() {
   const programFiltered = filterTahunProgram === 'semua' ? program : program.filter((p) => String(p.tahun) === String(filterTahunProgram));
   const programByKategori = {};
   KATEGORI_PROGRAM.forEach((k) => { programByKategori[k] = programFiltered.filter((p) => p.kategori === k); });
+
+  const BULAN_SINGKAT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+  function groupProgramByNama(items) {
+    const groups = {};
+    items.forEach((p) => {
+      const key = p.nama_program;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(p);
+    });
+    return Object.entries(groups).map(([nama, entries]) => {
+      const bulanList = entries
+        .filter((e) => e.tanggal)
+        .map((e) => BULAN_SINGKAT[new Date(e.tanggal).getMonth()])
+        .filter((v, i, arr) => arr.indexOf(v) === i);
+      return { nama, entries, count: entries.length, bulanLabel: bulanList.join(', ') };
+    }).sort((a, b) => b.count - a.count);
+  }
 
   return (
     <div style={{ maxWidth: 980, margin: '0 auto' }}>
@@ -469,12 +487,39 @@ export default function UmkmDetail() {
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{kat}</div>
               {programByKategori[kat].length === 0 ? (
                 <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Belum ada.</div>
-              ) : programByKategori[kat].map((p, i) => (
-                <div key={i} style={{ fontSize: 12, padding: '4px 0', borderTop: i > 0 ? '1px solid var(--line)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>{p.nama_program} <span style={{ color: 'var(--ink-soft)' }}>({p.tahun})</span></span>
-                  <button className="no-print" onClick={() => hapusProgram(p.id)} style={{ background: 'none', border: 'none', color: 'var(--clay)', fontSize: 11, cursor: 'pointer' }}>Hapus</button>
-                </div>
-              ))}
+              ) : groupProgramByNama(programByKategori[kat]).map((g, i) => {
+                const groupKey = kat + '|' + g.nama;
+                const isOpen = expandedProgram[groupKey];
+                return (
+                  <div key={groupKey} style={{ padding: '5px 0', borderTop: i > 0 ? '1px solid var(--line)' : 'none' }}>
+                    <div
+                      onClick={() => setExpandedProgram({ ...expandedProgram, [groupKey]: !isOpen })}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6, cursor: g.count > 1 ? 'pointer' : 'default' }}
+                    >
+                      <span style={{ fontSize: 12 }}>
+                        {g.nama}
+                        {g.count > 1 && <span style={{ color: 'var(--teal-500)', fontWeight: 700 }}> · {g.count}x</span>}
+                        {g.bulanLabel && <span style={{ color: 'var(--ink-soft)' }}> ({g.bulanLabel})</span>}
+                      </span>
+                      {g.count === 1 ? (
+                        <button className="no-print" onClick={(e) => { e.stopPropagation(); hapusProgram(g.entries[0].id); }} style={{ background: 'none', border: 'none', color: 'var(--clay)', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>Hapus</button>
+                      ) : (
+                        <span style={{ fontSize: 11, color: 'var(--ink-soft)', flexShrink: 0 }}>{isOpen ? '▲' : '▼'}</span>
+                      )}
+                    </div>
+                    {isOpen && g.count > 1 && (
+                      <div className="no-print" style={{ marginTop: 4, paddingLeft: 10, borderLeft: '2px solid var(--line)' }}>
+                        {g.entries.map((e) => (
+                          <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', color: 'var(--ink-soft)' }}>
+                            <span>{e.tanggal ? new Date(e.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : `Tahun ${e.tahun}`}</span>
+                            <button onClick={() => hapusProgram(e.id)} style={{ background: 'none', border: 'none', color: 'var(--clay)', fontSize: 11, cursor: 'pointer' }}>Hapus</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -494,4 +539,4 @@ export default function UmkmDetail() {
       )}
     </div>
   );
-                }
+}
