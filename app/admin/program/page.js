@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { supabase, catatLog, KATEGORI_PROGRAM } from '../../../lib/supabase';
+import ScanKehadiran from '../../../components/ScanKehadiran';
 
 export default function ProgramManagement() {
   const [loading, setLoading] = useState(true);
@@ -12,6 +13,7 @@ export default function ProgramManagement() {
   const [expandedProgram, setExpandedProgram] = useState({});
 
   const [showForm, setShowForm] = useState(false);
+  const [showScan, setShowScan] = useState(false);
   const [formKategori, setFormKategori] = useState('Pelatihan');
   const [formNama, setFormNama] = useState('');
   const [formTanggal, setFormTanggal] = useState('');
@@ -138,6 +140,7 @@ export default function ProgramManagement() {
           <select value={tahunPilih} onChange={(e) => setTahunPilih(parseInt(e.target.value))} style={{ padding: '10px 14px', border: '1.4px solid var(--line)', borderRadius: 8, fontSize: 14, fontWeight: 700, color: 'var(--teal-900)' }}>
             {tahunTersedia.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
+          <button className="btn-secondary" onClick={() => setShowScan(true)}>📷 Scan Kehadiran</button>
           <button className="btn-primary" onClick={() => bukaForm(null)}>+ Tambah Program</button>
         </div>
       </div>
@@ -280,6 +283,10 @@ export default function ProgramManagement() {
             </div>
           </div>
         </div>
+      )}
+
+      {showScan && (
+        <ScanKehadiran umkmList={umkmList} onSelesai={() => { setShowScan(false); loadAll(); }} />
       )}
     </div>
   );
