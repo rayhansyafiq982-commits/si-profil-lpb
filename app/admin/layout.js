@@ -51,6 +51,7 @@ export default function AdminLayout({ children }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <a href="/admin" style={{ color: '#fff', fontSize: 12.5, textDecoration: 'none', opacity: 0.9 }}>Rekap UMKM</a>
           <a href="/admin/wilayah" style={{ color: '#fff', fontSize: 12.5, textDecoration: 'none', opacity: 0.9 }}>Rekap Wilayah</a>
+          <a href="/admin/program" style={{ color: '#fff', fontSize: 12.5, textDecoration: 'none', opacity: 0.9 }}>Program</a>
           <span style={{ fontSize: 11.5, color: 'var(--gold-100)' }}>{user?.email}</span>
           <button onClick={logout} style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 8, padding: '8px 14px', fontSize: 13 }}>
             Keluar
