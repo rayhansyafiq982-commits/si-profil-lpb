@@ -108,6 +108,13 @@ export default function UmkmForm({ mode, existingData }) {
       setSelesai(true);
       return;
     }
+    if (isUpdate && !omzetDilewati && omzetInput && parseFloat(omzetInput) > 0 && parseFloat(omzetInput) < 1000) {
+      const dugaan = (parseFloat(omzetInput) * 1000000).toLocaleString('id-ID');
+      const lanjut = window.confirm(
+        `Omzet yang diisi (${omzetInput}) kelihatan kecil sekali.\n\nApakah maksudnya Rp${dugaan} (${omzetInput} juta)?\n\nKalau ya, klik OK lalu ubah isian jadi angka penuh dulu (mis. ${Math.round(parseFloat(omzetInput) * 1000000)}). Kalau memang benar segitu, klik Cancel untuk tetap simpan apa adanya.`
+      );
+      if (lanjut) return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -366,7 +373,11 @@ export default function UmkmForm({ mode, existingData }) {
             <h3 style={{ fontSize: 17 }}>5. Omzet {bulanNama[bulanIni - 1]} {tahunIni}</h3>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <div className="field" style={{ flex: 1 }}><label>Omzet (Rp)</label><input type="number" value={omzetInput} onChange={(e) => setOmzetInput(e.target.value)} placeholder="cth. 12000000" /></div>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Omzet (Rp)</label>
+              <input type="number" value={omzetInput} onChange={(e) => setOmzetInput(e.target.value)} placeholder="cth. 12000000" />
+              <div className="hint">Tulis angka penuh, bukan singkatan juta. Contoh: 12 juta rupiah ditulis <strong>12000000</strong>, bukan 12.5.</div>
+            </div>
           </div>
           <div className="field"><label>Profit (Rp) — opsional</label><input type="number" value={profitInput} onChange={(e) => setProfitInput(e.target.value)} placeholder="cth. 7200000" /></div>
 
