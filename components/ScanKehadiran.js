@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase, catatLog, KATEGORI_PROGRAM } from '../lib/supabase';
 
-export default function ScanKehadiran({ umkmList, onSelesai }) {
+export default function ScanKehadiran({ umkmList, daftarProgram, onSelesai }) {
   const [mode, setMode] = useState('setup'); // 'setup' | 'scanning'
   const [kategori, setKategori] = useState('Pelatihan');
   const [namaProgram, setNamaProgram] = useState('');
+  const [namaProgramPilihan, setNamaProgramPilihan] = useState('');
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
 
   const [tercatat, setTercatat] = useState([]); // {id_umkm, nama_umkm, waktu}
@@ -117,7 +118,7 @@ export default function ScanKehadiran({ umkmList, onSelesai }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div className="field" style={{ margin: 0 }}>
                 <label>Kategori</label>
-                <select value={kategori} onChange={(e) => setKategori(e.target.value)}>
+                <select value={kategori} onChange={(e) => { setKategori(e.target.value); setNamaProgramPilihan(''); setNamaProgram(''); }}>
                   {KATEGORI_PROGRAM.map((k) => <option key={k} value={k}>{k}</option>)}
                 </select>
               </div>
@@ -126,7 +127,25 @@ export default function ScanKehadiran({ umkmList, onSelesai }) {
                 <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
               </div>
             </div>
-            <div className="field"><label>Nama Program</label><input value={namaProgram} onChange={(e) => setNamaProgram(e.target.value)} placeholder="mis. Pelatihan QCC" /></div>
+            <div className="field">
+              <label>Nama Program</label>
+              <select
+                value={namaProgramPilihan}
+                onChange={(e) => {
+                  setNamaProgramPilihan(e.target.value);
+                  setNamaProgram(e.target.value === '__lainnya__' ? '' : e.target.value);
+                }}
+              >
+                <option value="">Pilih program...</option>
+                {(daftarProgram || []).filter((p) => p.kategori === kategori).map((p) => (
+                  <option key={p.nama} value={p.nama}>{p.nama}{p.status ? ` (${p.status})` : ''}</option>
+                ))}
+                <option value="__lainnya__">✏️ Lainnya — ketik manual</option>
+              </select>
+              {namaProgramPilihan === '__lainnya__' && (
+                <input value={namaProgram} onChange={(e) => setNamaProgram(e.target.value)} placeholder="Ketik nama program baru" style={{ marginTop: 8 }} />
+              )}
+            </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
               <button className="btn-secondary" onClick={onSelesai}>Batal</button>
               <button className="btn-primary" style={{ flex: 1 }} onClick={mulaiScan} disabled={!namaProgram.trim()}>📷 Mulai Scan</button>
