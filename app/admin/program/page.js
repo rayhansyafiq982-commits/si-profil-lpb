@@ -54,6 +54,21 @@ export default function ProgramManagement() {
 
   const programTahunIni = useMemo(() => program.filter((p) => p.tahun === tahunPilih), [program, tahunPilih]);
 
+  const daftarProgramGabungan = useMemo(() => {
+    const dariRencana = programRencana.map((r) => ({ kategori: r.kategori, nama: r.nama_program, status: r.status }));
+    const namaSudahAda = new Set(dariRencana.map((d) => d.kategori + '|' + d.nama));
+    const dariRiwayat = [];
+    const seen = new Set();
+    program.forEach((p) => {
+      const key = p.kategori + '|' + p.nama_program;
+      if (!namaSudahAda.has(key) && !seen.has(key)) {
+        seen.add(key);
+        dariRiwayat.push({ kategori: p.kategori, nama: p.nama_program, status: null });
+      }
+    });
+    return [...dariRencana, ...dariRiwayat].sort((a, b) => a.nama.localeCompare(b.nama));
+  }, [programRencana, program]);
+
   const groupedByKategori = useMemo(() => {
     const result = {};
     KATEGORI_PROGRAM.forEach((kat) => {
@@ -286,7 +301,7 @@ export default function ProgramManagement() {
       )}
 
       {showScan && (
-        <ScanKehadiran umkmList={umkmList} onSelesai={() => { setShowScan(false); loadAll(); }} />
+        <ScanKehadiran umkmList={umkmList} daftarProgram={daftarProgramGabungan} onSelesai={() => { setShowScan(false); loadAll(); }} />
       )}
     </div>
   );
