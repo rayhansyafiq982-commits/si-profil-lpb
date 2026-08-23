@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { supabase, catatLog, KATEGORI_PROGRAM, KELAS_OPSI, LEGALITAS_OPSI } from '../../../../lib/supabase';
+import { useRole } from '../../../../lib/RoleContext';
 import QRCode from 'qrcode';
 
 export default function UmkmDetail() {
   const { id } = useParams();
+  const { isAdmin } = useRole();
   const [loading, setLoading] = useState(true);
   const [umkm, setUmkm] = useState(null);
   const [legalitas, setLegalitas] = useState([]);
@@ -30,6 +32,7 @@ export default function UmkmDetail() {
   const [linkPribadi, setLinkPribadi] = useState('');
 
   async function toggleStatus() {
+    if (!isAdmin) return;
     setSavingStatus(true);
     const statusTerbaru = [...statusList].sort((a, b) => b.tahun - a.tahun)[0]?.status;
     const statusBaru = statusTerbaru === 'Aktif' ? 'Tidak Aktif' : 'Aktif';
@@ -43,6 +46,7 @@ export default function UmkmDetail() {
   }
 
   async function bagikanLink() {
+    if (!isAdmin) return;
     const origin = window.location.origin;
     const link = `${origin}/f/${umkm.id_umkm}/${umkm.akses_token}`;
     setLinkPribadi(link);
@@ -75,11 +79,13 @@ export default function UmkmDetail() {
   const [newKemasan, setNewKemasan] = useState({ jenis_kemasan: '', ukuran: '' });
 
   function mulaiEditProfil() {
+    if (!isAdmin) return;
     setProfilForm({ ...umkm });
     setEditProfil(true);
   }
 
   async function simpanProfil() {
+    if (!isAdmin) return;
     setSavingProfil(true);
     await supabase.from('master_umkm').update({
       ...profilForm,
@@ -93,6 +99,7 @@ export default function UmkmDetail() {
   }
 
   function mulaiEditLegalitas() {
+    if (!isAdmin) return;
     setLegalitasChips(legalitas.filter((l) => l.jenis_legalitas).map((l) => l.jenis_legalitas));
     setCatatanLegalitas(legalitas.find((l) => l.catatan)?.catatan || '');
     setEditLegalitas(true);
@@ -103,6 +110,7 @@ export default function UmkmDetail() {
   }
 
   async function simpanLegalitas() {
+    if (!isAdmin) return;
     await supabase.from('legalitas').delete().eq('id_umkm', id);
     if (legalitasChips.length > 0 || catatanLegalitas) {
       const rows = legalitasChips.length > 0
@@ -116,29 +124,32 @@ export default function UmkmDetail() {
   }
 
   async function tambahProdukAdmin() {
-    if (!newProduk.nama_produk.trim()) return;
+    if (!isAdmin || !newProduk.nama_produk.trim()) return;
     await supabase.from('produk').insert({ id_umkm: id, ...newProduk });
     await catatLog(id, 'Tambah Produk (Admin)', newProduk.nama_produk);
     setNewProduk({ nama_produk: '', kategori: '', varian: '' });
     loadAll();
   }
   async function hapusProduk(produkId) {
+    if (!isAdmin) return;
     await supabase.from('produk').delete().eq('id', produkId);
     loadAll();
   }
   async function tambahKemasanAdmin() {
-    if (!newKemasan.jenis_kemasan.trim()) return;
+    if (!isAdmin || !newKemasan.jenis_kemasan.trim()) return;
     await supabase.from('kemasan').insert({ id_umkm: id, ...newKemasan });
     await catatLog(id, 'Tambah Kemasan (Admin)', newKemasan.jenis_kemasan);
     setNewKemasan({ jenis_kemasan: '', ukuran: '' });
     loadAll();
   }
   async function hapusKemasan(kemasanId) {
+    if (!isAdmin) return;
     await supabase.from('kemasan').delete().eq('id', kemasanId);
     loadAll();
   }
 
   async function hapusProgram(programId) {
+    if (!isAdmin) return;
     await supabase.from('program_aktivitas').delete().eq('id', programId);
     await catatLog(id, 'Hapus Program', `Program dihapus (id: ${programId})`);
     loadAll();
@@ -172,7 +183,7 @@ export default function UmkmDetail() {
   }
 
   async function tambahProgram() {
-    if (!newProgram.nama_program.trim()) return;
+    if (!isAdmin || !newProgram.nama_program.trim()) return;
     await supabase.from('program_aktivitas').insert({ id_umkm: id, ...newProgram, sumber: 'Fasilitator' });
     await catatLog(id, 'Tambah Program', `${newProgram.kategori}: ${newProgram.nama_program}`);
     setNewProgram({ kategori: 'Pelatihan', nama_program: '', tahun: 2026, tanggal: '', status: 'Selesai' });
@@ -181,6 +192,7 @@ export default function UmkmDetail() {
   }
 
   async function tambahKelas() {
+    if (!isAdmin) return;
     await supabase.from('kelas_kemandirian').upsert({ id_umkm: id, ...newKelas }, { onConflict: 'id_umkm,tahun,jenis_penilai' });
     await catatLog(id, 'Update Kelas', `${newKelas.jenis_penilai} ${newKelas.tahun}: ${newKelas.kelas}`);
     setShowKelasForm(false);
@@ -248,9 +260,11 @@ export default function UmkmDetail() {
                 {umkm.nama_pemilik && <>Pemilik: {umkm.nama_pemilik} · </>}
                 {umkm.wilayah} · Bergabung {umkm.tahun_masuk || '-'}
               </div>
-              <button className="btn-ghost no-print" style={{ marginTop: 6, fontSize: 11.5 }} onClick={toggleStatus} disabled={savingStatus}>
-                {savingStatus ? 'Menyimpan...' : '🔄 Ubah status Aktif / Tidak Aktif (tahun 2026)'}
-              </button>
+              {isAdmin && (
+                <button className="btn-ghost no-print" style={{ marginTop: 6, fontSize: 11.5 }} onClick={toggleStatus} disabled={savingStatus}>
+                  {savingStatus ? 'Menyimpan...' : '🔄 Ubah status Aktif / Tidak Aktif (tahun 2026)'}
+                </button>
+              )}
             </div>
             <div style={{ textAlign: 'right', fontSize: 13, color: 'var(--ink-soft)' }}>
               <div>📞 {umkm.no_hp || 'Belum ada nomor'}</div>
@@ -262,11 +276,13 @@ export default function UmkmDetail() {
                   <span className="badge warn">⚠ Link belum pernah dibagikan</span>
                 )}
               </div>
-              <div className="no-print" style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={mulaiEditProfil}>✏️ Edit Profil</button>
-                <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={bagikanLink}>🔗 Bagikan Link Pribadi</button>
-                <Link href={`/admin/umkm/${id}/kartu`} className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px', textDecoration: 'none' }}>🖨️ Cetak Kartu</Link>
-              </div>
+              {isAdmin && (
+                <div className="no-print" style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                  <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={mulaiEditProfil}>✏️ Edit Profil</button>
+                  <button className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px' }} onClick={bagikanLink}>🔗 Bagikan Link Pribadi</button>
+                  <Link href={`/admin/umkm/${id}/kartu`} className="btn-secondary" style={{ fontSize: 12, padding: '8px 14px', textDecoration: 'none' }}>🖨️ Cetak Kartu</Link>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -309,7 +325,7 @@ export default function UmkmDetail() {
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <h4 style={{ fontSize: 15 }}>Legalitas</h4>
-            {!editLegalitas && <button className="btn-ghost no-print" onClick={mulaiEditLegalitas}>✏️ Edit</button>}
+            {isAdmin && !editLegalitas && <button className="btn-ghost no-print" onClick={mulaiEditLegalitas}>✏️ Edit</button>}
           </div>
           {!editLegalitas ? (
             <>
@@ -340,7 +356,7 @@ export default function UmkmDetail() {
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <h4 style={{ fontSize: 15 }}>Produk & Kemasan</h4>
-            {!editProdukKemasan && <button className="btn-ghost no-print" onClick={() => setEditProdukKemasan(true)}>✏️ Edit</button>}
+            {isAdmin && !editProdukKemasan && <button className="btn-ghost no-print" onClick={() => setEditProdukKemasan(true)}>✏️ Edit</button>}
           </div>
           {produk.length === 0 ? <div style={{ color: 'var(--ink-soft)', fontSize: 13 }}>Belum ada data produk.</div> : (
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
@@ -362,7 +378,7 @@ export default function UmkmDetail() {
               ))}
             </div>
           )}
-          {editProdukKemasan && (
+          {isAdmin && editProdukKemasan && (
             <div className="no-print" style={{ marginTop: 14, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                 <input placeholder="Nama produk baru" value={newProduk.nama_produk} onChange={(e) => setNewProduk({ ...newProduk, nama_produk: e.target.value })} style={{ flex: 1, padding: '8px 10px', border: '1.4px solid var(--line)', borderRadius: 6, fontSize: 12.5 }} />
@@ -381,9 +397,9 @@ export default function UmkmDetail() {
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h4 style={{ fontSize: 15 }}>Kelas Kemandirian</h4>
-          <button className="btn-ghost no-print" onClick={() => setShowKelasForm(!showKelasForm)}>+ Update kelas</button>
+          {isAdmin && <button className="btn-ghost no-print" onClick={() => setShowKelasForm(!showKelasForm)}>+ Update kelas</button>}
         </div>
-        {showKelasForm && (
+        {isAdmin && showKelasForm && (
           <div className="no-print" style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div className="field" style={{ margin: 0 }}>
               <label>Tahun</label>
@@ -456,10 +472,10 @@ export default function UmkmDetail() {
               <option value="semua">Semua Tahun</option>
               {[...new Set(program.map((p) => p.tahun))].sort((a, b) => b - a).map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
-            <button className="btn-ghost" onClick={() => setShowProgramForm(!showProgramForm)}>+ Catat program</button>
+            {isAdmin && <button className="btn-ghost" onClick={() => setShowProgramForm(!showProgramForm)}>+ Catat program</button>}
           </div>
         </div>
-        {showProgramForm && (
+        {isAdmin && showProgramForm && (
           <div className="no-print" style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div className="field" style={{ margin: 0 }}>
               <label>Tahun</label>
@@ -507,7 +523,7 @@ export default function UmkmDetail() {
                         {g.bulanLabel && <span style={{ color: 'var(--ink-soft)' }}> ({g.bulanLabel})</span>}
                       </span>
                       {g.count === 1 ? (
-                        <button className="no-print" onClick={(e) => { e.stopPropagation(); hapusProgram(g.entries[0].id); }} style={{ background: 'none', border: 'none', color: 'var(--clay)', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>Hapus</button>
+                        isAdmin && <button className="no-print" onClick={(e) => { e.stopPropagation(); hapusProgram(g.entries[0].id); }} style={{ background: 'none', border: 'none', color: 'var(--clay)', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}>Hapus</button>
                       ) : (
                         <span style={{ fontSize: 11, color: 'var(--ink-soft)', flexShrink: 0 }}>{isOpen ? '▲' : '▼'}</span>
                       )}
@@ -517,7 +533,7 @@ export default function UmkmDetail() {
                         {g.entries.map((e) => (
                           <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0', color: 'var(--ink-soft)' }}>
                             <span>{e.tanggal ? new Date(e.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : `Tahun ${e.tahun}`}</span>
-                            <button onClick={() => hapusProgram(e.id)} style={{ background: 'none', border: 'none', color: 'var(--clay)', fontSize: 11, cursor: 'pointer' }}>Hapus</button>
+                            {isAdmin && <button onClick={() => hapusProgram(e.id)} style={{ background: 'none', border: 'none', color: 'var(--clay)', fontSize: 11, cursor: 'pointer' }}>Hapus</button>}
                           </div>
                         ))}
                       </div>
@@ -530,7 +546,7 @@ export default function UmkmDetail() {
         </div>
       </div>
 
-      {log.length > 0 && (
+      {isAdmin && log.length > 0 && (
         <div className="card no-print">
           <h4 style={{ fontSize: 15, marginBottom: 10 }}>Riwayat Perubahan Terakhir</h4>
           <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
