@@ -118,63 +118,26 @@ export default function UmkmForm({ mode, existingData }) {
     setLoading(true);
     setError('');
     try {
-      let finalId = existingData?.umkm?.id_umkm;
-      let finalToken = existingData?.umkm?.akses_token;
+      // Semua penulisan data (profil, legalitas, produk, kemasan, omzet, pendaftaran baru)
+      // sekarang lewat satu fungsi database (RPC) yang memvalidasi akses_token di server,
+      // bukan menulis langsung ke tabel dari client seperti sebelumnya.
+      const { data: hasil, error: rpcErr } = await supabase.rpc('submit_umkm_mandiri', {
+        p_id_umkm: existingData?.umkm?.id_umkm || null,
+        p_token: existingData?.umkm?.akses_token || null,
+        p_is_baru: !isUpdate,
+        p_profil: profil,
+        p_legalitas: { chips: legalitasChips, catatan: catatanLegalitas },
+        p_produk: produkList,
+        p_kemasan: kemasanList,
+        p_pelatihan: !isUpdate ? pelatihanList : null,
+        p_omzet: (isUpdate && !omzetDilewati && (omzetInput || profitInput))
+          ? { omzet: omzetInput, profit: profitInput }
+          : null,
+      });
+      if (rpcErr) throw rpcErr;
 
-      if (isUpdate) {
-        const { error: updErr } = await supabase.from('master_umkm').update({
-          ...profil, tahun_masuk: profil.tahun_masuk ? parseInt(profil.tahun_masuk, 10) : null,
-          updated_at: new Date().toISOString(),
-        }).eq('id_umkm', finalId);
-        if (updErr) throw updErr;
-        await catatLog(finalId, 'Update Data', 'Profil diperbarui via link pribadi');
-      } else {
-        finalId = await generateNextUmkmId();
-        const { data: inserted, error: insErr } = await supabase.from('master_umkm').insert({
-          id_umkm: finalId, ...profil, tahun_masuk: profil.tahun_masuk ? parseInt(profil.tahun_masuk, 10) : null,
-        }).select('akses_token').single();
-        if (insErr) throw insErr;
-        finalToken = inserted.akses_token;
-        await catatLog(finalId, 'Daftar Baru', `UMKM baru: ${profil.nama_umkm}`);
-      }
-
-      await supabase.from('legalitas').delete().eq('id_umkm', finalId);
-      if (legalitasChips.length > 0 || catatanLegalitas) {
-        const rows = legalitasChips.length > 0
-          ? legalitasChips.map((jenis) => ({ id_umkm: finalId, jenis_legalitas: jenis, catatan: catatanLegalitas || null }))
-          : [{ id_umkm: finalId, jenis_legalitas: null, catatan: catatanLegalitas }];
-        await supabase.from('legalitas').insert(rows);
-      }
-
-      await supabase.from('produk').delete().eq('id_umkm', finalId);
-      const produkValid = produkList.filter((p) => p.nama_produk.trim());
-      if (produkValid.length > 0) {
-        await supabase.from('produk').insert(produkValid.map((p) => ({ id_umkm: finalId, nama_produk: p.nama_produk, kategori: p.kategori, varian: p.varian })));
-      }
-
-      await supabase.from('kemasan').delete().eq('id_umkm', finalId);
-      const kemasanValid = kemasanList.filter((k) => k.jenis_kemasan.trim());
-      if (kemasanValid.length > 0) {
-        await supabase.from('kemasan').insert(kemasanValid.map((k) => ({ id_umkm: finalId, jenis_kemasan: k.jenis_kemasan, ukuran: k.ukuran })));
-      }
-
-      if (!isUpdate) {
-        const pelatihanValid = pelatihanList.filter((p) => p.trim());
-        if (pelatihanValid.length > 0) {
-          await supabase.from('program_aktivitas').insert(pelatihanValid.map((nama) => ({
-            id_umkm: finalId, kategori: 'Pelatihan', nama_program: nama, tahun: tahunIni, sumber: 'UMKM',
-          })));
-        }
-      }
-
-      if (isUpdate && !omzetDilewati && (omzetInput || profitInput)) {
-        await supabase.from('omzet_bulanan').upsert({
-          id_umkm: finalId, tahun: tahunIni, bulan: bulanIni,
-          omzet: omzetInput ? parseFloat(omzetInput) : null,
-          profit: profitInput ? parseFloat(profitInput) : null,
-        }, { onConflict: 'id_umkm,tahun,bulan' });
-        await catatLog(finalId, 'Input Omzet', `${bulanNama[bulanIni - 1]} ${tahunIni}: Rp${omzetInput || 0}`);
-      }
+      const finalId = hasil.id_umkm;
+      const finalToken = hasil.akses_token;
 
       if (!isUpdate) {
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
