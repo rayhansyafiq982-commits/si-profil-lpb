@@ -15,23 +15,27 @@ export default function LinkPribadiPage() {
 
   async function loadData() {
     setLoading(true);
-    const { data: umkm, error } = await supabase
-      .from('master_umkm').select('*').eq('id_umkm', id).eq('akses_token', token).maybeSingle();
 
-    if (error || !umkm) {
+    const { data: hasil, error } = await supabase.rpc('get_umkm_mandiri', {
+      p_id_umkm: id,
+      p_token: token,
+    });
+
+    if (error || !hasil) {
       setNotFound(true);
       setLoading(false);
       return;
     }
 
-    const [legalitas, produk, kemasan, omzetRiwayat] = await Promise.all([
-      supabase.from('legalitas').select('*').eq('id_umkm', id),
-      supabase.from('produk').select('*').eq('id_umkm', id),
-      supabase.from('kemasan').select('*').eq('id_umkm', id),
-      supabase.from('omzet_bulanan').select('*').eq('id_umkm', id).order('tahun', { ascending: false }).order('bulan', { ascending: false }).limit(6),
-    ]);
-
-    setData({ umkm, legalitas: legalitas.data || [], produk: produk.data || [], kemasan: kemasan.data || [], omzetRiwayat: omzetRiwayat.data || [] });
+    // token tidak pernah dikirim balik oleh server (tidak lagi ada di kolom umkm);
+    // kita sisipkan kembali dari URL agar UmkmForm tetap bisa memakainya saat submit.
+    setData({
+      umkm: { ...hasil.umkm, akses_token: token },
+      legalitas: hasil.legalitas || [],
+      produk: hasil.produk || [],
+      kemasan: hasil.kemasan || [],
+      omzetRiwayat: hasil.omzet_bulanan || [],
+    });
     setLoading(false);
   }
 
