@@ -20,6 +20,26 @@ const WARNA_STATUS = {
   '-': '#cfc9b8',
 };
 
+const WARNA_KATEGORI = {
+  Pelatihan: '#0f5257',
+  Pendampingan: '#177a7e',
+  Pemasaran: '#d9a441',
+  Pembiayaan: '#c15b3c',
+};
+
+function BarRow({ label, value, max, color }) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
+      <span style={{ width: 92, flexShrink: 0, color: 'var(--ink)' }}>{label}</span>
+      <div style={{ flex: 1, background: 'var(--line)', borderRadius: 6, height: 14, overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 6 }} />
+      </div>
+      <span style={{ width: 34, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5, color: 'var(--ink-soft)' }}>{value}</span>
+    </div>
+  );
+}
+
 // Menghasilkan warna berbeda-beda untuk kategori dinamis (bidang usaha, wilayah)
 function warnaDinamis(i, total) {
   const hue = Math.round((360 / Math.max(total, 1)) * i);
@@ -60,19 +80,22 @@ export default function StatistikDashboard() {
   const [umkmList, setUmkmList] = useState([]);
   const [statusRows, setStatusRows] = useState([]);
   const [kelasRows, setKelasRows] = useState([]);
+  const [programRows, setProgramRows] = useState([]);
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
-    const [{ data: umkm }, { data: status }, { data: kelas }] = await Promise.all([
+    const [{ data: umkm }, { data: status }, { data: kelas }, { data: program }] = await Promise.all([
       supabase.from('master_umkm').select('id_umkm, bidang_usaha, wilayah, tahun_masuk'),
       supabase.from('status_tahunan').select('id_umkm, tahun, status'),
       supabase.from('kelas_kemandirian').select('id_umkm, tahun, jenis_penilai, kelas'),
+      supabase.from('program_aktivitas').select('id_umkm, kategori, tahun'),
     ]);
     setUmkmList(umkm || []);
     setStatusRows(status || []);
     setKelasRows(kelas || []);
+    setProgramRows(program || []);
     setLoading(false);
   }
 
@@ -93,6 +116,33 @@ export default function StatistikDashboard() {
     });
     return Object.entries(hitung).map(([label, value]) => ({ label, value, color: WARNA_STATUS[label] }));
   }, [statusRows, tahun]);
+
+  // --- 2b. Ringkasan jumlah Aktif / Tidak Aktif & persentase (tahun terpilih) ---
+  const ringkasanStatus = useMemo(() => {
+    const aktif = dataStatus.find((d) => d.label === 'Aktif')?.value || 0;
+    const tidakAktif = dataStatus.find((d) => d.label === 'Tidak Aktif')?.value || 0;
+    const total = aktif + tidakAktif;
+    const pct = total > 0 ? ((aktif / total) * 100).toFixed(1) : '0.0';
+    return { aktif, tidakAktif, total, pct };
+  }, [dataStatus]);
+
+  // --- Kategori program yang diikuti UMKM Aktif pada tahun terpilih ---
+  const dataKategoriProgram = useMemo(() => {
+    const idAktifTahunIni = new Set(
+      statusRows.filter((s) => s.tahun === tahun && s.status === 'Aktif').map((s) => s.id_umkm)
+    );
+    const hitung = { Pelatihan: 0, Pendampingan: 0, Pemasaran: 0, Pembiayaan: 0 };
+    const sudahDihitung = new Set(); // hindari ganda per id_umkm+kategori
+    programRows
+      .filter((p) => p.tahun === tahun && idAktifTahunIni.has(p.id_umkm))
+      .forEach((p) => {
+        const key = `${p.id_umkm}|${p.kategori}`;
+        if (sudahDihitung.has(key)) return;
+        sudahDihitung.add(key);
+        if (hitung[p.kategori] !== undefined) hitung[p.kategori] += 1;
+      });
+    return hitung;
+  }, [programRows, statusRows, tahun]);
 
   // --- UMKM yang "ada" pada tahun terpilih (untuk bidang usaha & wilayah, dihitung kumulatif berdasarkan tahun masuk) ---
   const umkmTahunIni = useMemo(
@@ -143,6 +193,12 @@ export default function StatistikDashboard() {
         </div>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginBottom: 18 }}>
+        <div className="kpi-card"><div className="kpi-val" style={{ color: 'var(--sage)' }}>{ringkasanStatus.aktif}</div><div className="kpi-lbl">UMKM Aktif ({tahun})</div></div>
+        <div className="kpi-card"><div className="kpi-val" style={{ color: 'var(--clay)' }}>{ringkasanStatus.tidakAktif}</div><div className="kpi-lbl">UMKM Tidak Aktif ({tahun})</div></div>
+        <div className="kpi-card"><div className="kpi-val" style={{ color: 'var(--teal-900)' }}>{ringkasanStatus.pct}%</div><div className="kpi-lbl">% Aktif dari total {ringkasanStatus.total}</div></div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18 }}>
         <CardChart
           title="Distribusi Kelas Kemandirian"
@@ -177,6 +233,26 @@ export default function StatistikDashboard() {
           subtitle={`UMKM terdaftar hingga tahun ${tahun} (${umkmTahunIni.length} UMKM)`}
           data={dataWilayah}
         />
+        <div style={{
+          background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 14,
+          padding: 20, display: 'flex', flexDirection: 'column', gap: 14,
+        }}>
+          <div>
+            <h3 style={{ fontSize: 16, marginBottom: 2 }}>Program yang Diikuti UMKM Aktif</h3>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Tahun {tahun} &middot; {ringkasanStatus.aktif} UMKM aktif</div>
+          </div>
+          {ringkasanStatus.aktif === 0 ? (
+            <div style={{ textAlign: 'center', color: 'var(--ink-soft)', fontSize: 13, padding: '30px 0' }}>
+              Belum ada data untuk tahun ini.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {Object.entries(dataKategoriProgram).map(([label, value]) => (
+                <BarRow key={label} label={label} value={value} max={ringkasanStatus.aktif} color={WARNA_KATEGORI[label]} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div style={{ marginTop: 18, fontSize: 11.5, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
