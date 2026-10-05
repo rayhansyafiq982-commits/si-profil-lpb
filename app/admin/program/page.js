@@ -78,10 +78,21 @@ export default function ProgramManagement() {
         if (!byNama[p.nama_program]) byNama[p.nama_program] = [];
         byNama[p.nama_program].push(p);
       });
-      result[kat] = Object.entries(byNama).map(([nama, rows]) => ({
-        nama, rows, count: rows.length,
-        tanggalTerbaru: rows.map((r) => r.tanggal).filter(Boolean).sort().reverse()[0],
-      })).sort((a, b) => b.count - a.count);
+      result[kat] = Object.entries(byNama).map(([nama, semuaRows]) => {
+        // Satu UMKM bisa punya >1 baris untuk program yang sama (mis. data impor KPI + input manual) — tampilkan tiap UMKM sekali saja.
+        const rowTerlihat = new Map();
+        semuaRows.forEach((r) => {
+          const existing = rowTerlihat.get(r.id_umkm);
+          if (!existing || (r.tanggal && (!existing.tanggal || r.tanggal > existing.tanggal))) {
+            rowTerlihat.set(r.id_umkm, r);
+          }
+        });
+        const rows = Array.from(rowTerlihat.values());
+        return {
+          nama, rows, count: rows.length,
+          tanggalTerbaru: rows.map((r) => r.tanggal).filter(Boolean).sort().reverse()[0],
+        };
+      }).sort((a, b) => b.count - a.count);
     });
     return result;
   }, [programTahunIni]);
@@ -238,8 +249,8 @@ export default function ProgramManagement() {
                   </div>
                   {isOpen && (
                     <div style={{ marginTop: 6, paddingLeft: 10, borderLeft: '2px solid var(--line)', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                      {g.rows.map((r, j) => (
-                        <span key={j} className="badge ok" style={{ fontSize: 10.5 }}>{namaMap[r.id_umkm] || r.id_umkm}</span>
+                      {g.rows.map((r) => (
+                        <span key={r.id_umkm} className="badge ok" style={{ fontSize: 10.5 }}>{namaMap[r.id_umkm] || r.id_umkm}</span>
                       ))}
                     </div>
                   )}
