@@ -97,7 +97,17 @@ export default function ProgramManagement() {
     return result;
   }, [programTahunIni]);
 
-  const totalProgramTahunIni = Object.values(groupedByKategori).reduce((s, arr) => s + arr.length, 0);
+  // Program resmi 2026 = daftar program_rencana (sama dengan sheet "Program" LPB 2026); jumlah dihitung dari sini, bukan dari riwayat peserta.
+  const adaDaftarResmi = tahunPilih === 2026 && programRencana.length > 0;
+  const totalProgramTahunIni = adaDaftarResmi
+    ? programRencana.length
+    : Object.values(groupedByKategori).reduce((s, arr) => s + arr.length, 0);
+  const jumlahBerjalan = programRencana.filter((r) => r.status === 'Sedang Berjalan').length;
+  const jumlahSelesai = programRencana.filter((r) => r.status === 'Sudah Terlaksana').length;
+  const jumlahPesertaProgram = (kategori, nama) => {
+    const g = (groupedByKategori[kategori] || []).find((x) => x.nama === nama);
+    return g ? g.count : 0;
+  };
   const totalPesertaTahunIni = programTahunIni.length;
 
   const umkmTersaring = useMemo(() => {
@@ -172,22 +182,49 @@ export default function ProgramManagement() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
-        <div className="card"><div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--teal-900)' }}>{totalProgramTahunIni}</div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Jenis program berjalan di {tahunPilih}</div></div>
-        <div className="card"><div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--sage)' }}>{totalPesertaTahunIni}</div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Total keikutsertaan UMKM di {tahunPilih}</div></div>
+        <div className="card"><div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--teal-900)' }}>{totalProgramTahunIni}</div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Total program {tahunPilih}</div></div>
         <div className="card">
-          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--teal-500)' }}>{programRencana.filter((r) => r.status === 'Sedang Berjalan').length}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>🔄 Pendampingan berjalan (bulanan)</div>
+          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--teal-500)' }}>{jumlahBerjalan}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>🔄 Sedang berjalan</div>
         </div>
-        <div className="card" style={{ borderColor: programRencana.filter((r) => r.status === 'Belum Terlaksana').length > 0 ? 'var(--gold-500)' : 'var(--line)' }}>
-          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--gold-500)' }}>{programRencana.filter((r) => r.status === 'Belum Terlaksana').length}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>📋 Program direncanakan, belum terlaksana</div>
+        <div className="card">
+          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--sage)' }}>{jumlahSelesai}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>✅ Sudah terlaksana</div>
         </div>
+        <div className="card"><div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, color: 'var(--gold-500)' }}>{totalPesertaTahunIni}</div><div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>Total keikutsertaan UMKM di {tahunPilih}</div></div>
       </div>
+
+      {adaDaftarResmi && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h4 style={{ fontSize: 15, marginBottom: 4 }}>Daftar {programRencana.length} Program {tahunPilih}</h4>
+          <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 12 }}>Mengikuti sheet "Program" LPB 2026. Angka di kanan adalah jumlah UMKM peserta yang tercatat.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+            {KATEGORI_PROGRAM.concat(['Lainnya']).map((kat) => {
+              const items = programRencana.filter((r) => r.kategori === kat);
+              if (items.length === 0) return null;
+              return (
+                <div key={kat}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--teal-900)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>{kat} ({items.length})</div>
+                  {items.map((r) => (
+                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: '1px solid var(--line)' }}>
+                      <span style={{ fontSize: 12.5 }}>{r.nama_program}</span>
+                      <span style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}>{jumlahPesertaProgram(r.kategori, r.nama_program)} UMKM</span>
+                        <span className={r.status === 'Sudah Terlaksana' ? 'badge ok' : 'badge'} style={{ fontSize: 10.5 }}>{r.status === 'Sudah Terlaksana' ? 'Sudah' : r.status === 'Sedang Berjalan' ? 'Berjalan' : 'Belum'}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {programRencana.filter((r) => r.status === 'Sedang Berjalan').length > 0 && (
         <div className="card" style={{ marginBottom: 20, borderColor: 'var(--teal-500)' }}>
-          <h4 style={{ fontSize: 15, marginBottom: 4 }}>🔄 Pendampingan — Berjalan Setiap Bulan</h4>
-          <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 12 }}>Aktivitas rutin, bukan acara sekali jalan. Klik "📝 Catat Bulan Ini" tiap kali ada UMKM yang ikut — daftar ini tidak akan hilang setelah dicatat, karena berlangsung terus tiap bulan.</p>
+          <h4 style={{ fontSize: 15, marginBottom: 4 }}>🔄 Program Sedang Berjalan</h4>
+          <p style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 12 }}>Klik "📝 Catat Bulan Ini" tiap kali ada UMKM yang ikut — daftar ini tidak hilang setelah dicatat, karena program masih berlangsung.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {programRencana.filter((r) => r.status === 'Sedang Berjalan').map((r, i) => (
               <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 0', borderTop: i > 0 ? '1px solid var(--line)' : 'none' }}>
